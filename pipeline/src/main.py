@@ -12,6 +12,40 @@ from dukascopy_python.instruments import (
     I_GBP_USD,
     I_AUD_USD,
     I_NZD_USD,
+    
+    I_USD_JPY,
+    I_USD_CHF,
+    I_USD_CAD,
+
+    I_XAU_USD,
+    I_XAG_USD,
+    I_COPPER_CMD_USD,
+    
+    I_USA500_IDX_USD,
+    I_USATECH_IDX_USD,
+    
+    I_BRENT_CMD_USD,
+    I_LIGHT_CMD_USD,
+    I_GAS_CMD_USD,
+    I_DIESEL_CMD_USD,
+
+    I_SUGAR_CMD_USD,
+    I_COCOA_CMD_USD,
+
+    I_COFFEE_CMD_USX,
+    I_COTTON_CMD_USX,
+    I_SOYBEAN_CMD_USX,
+
+    I_AAPL_US_USD,
+    I_MSFT_US_USD,
+    I_TSLA_US_USD,
+    I_AMZN_US_USD,
+    I_NVDA_US_USD,
+    I_GOOGL_US_USD,
+    I_JPM_US_USD,
+    I_GE_US_USD,
+
+    I_USTBOND_TR_USD,
 )
 from pathlib import Path
 
@@ -56,6 +90,40 @@ def parser() -> None:
         "GBP": I_GBP_USD,
         "AUD": I_AUD_USD,
         "NZD": I_NZD_USD,
+
+        "JPY": I_USD_JPY,
+        "CHF": I_USD_CHF,
+        "CAD": I_USD_CAD,
+
+        "XAU": I_XAU_USD,
+        "XAG": I_XAG_USD,
+        "COPPER": I_COPPER_CMD_USD,
+
+        "USA500": I_USA500_IDX_USD,
+        "USATECH": I_USATECH_IDX_USD,
+
+        "BRENT": I_BRENT_CMD_USD,
+        "LIGHT": I_LIGHT_CMD_USD,
+        "GAS": I_GAS_CMD_USD,
+        "DIESEL": I_DIESEL_CMD_USD,
+
+        "SUGAR": I_SUGAR_CMD_USD,
+        "COCOA": I_COCOA_CMD_USD,
+
+        "COFFEE": I_COFFEE_CMD_USX,
+        "COTTON": I_COTTON_CMD_USX,
+        "SOYBEAN": I_SOYBEAN_CMD_USX,
+
+        "AAPL": I_AAPL_US_USD,
+        "MSFT": I_MSFT_US_USD,
+        "TSLA": I_TSLA_US_USD,
+        "AMZN": I_AMZN_US_USD,
+        "NVDA": I_NVDA_US_USD,
+        "GOOGL": I_GOOGL_US_USD,
+        "JPM": I_JPM_US_USD,
+        "GE": I_GE_US_USD,
+
+        "USTBOND": I_USTBOND_TR_USD,
     }
 
     for symbol, instr in assets.items():
@@ -127,6 +195,40 @@ def analyst() -> None:
         "GBP": I_GBP_USD,
         "AUD": I_AUD_USD,
         "NZD": I_NZD_USD,
+
+        "JPY": I_USD_JPY,
+        "CHF": I_USD_CHF,
+        "CAD": I_USD_CAD,
+
+        "XAU": I_XAU_USD,
+        "XAG": I_XAG_USD,
+        "COPPER": I_COPPER_CMD_USD,
+
+        "USA500": I_USA500_IDX_USD,
+        "USATECH": I_USATECH_IDX_USD,
+
+        "BRENT": I_BRENT_CMD_USD,
+        "LIGHT": I_LIGHT_CMD_USD,
+        "GAS": I_GAS_CMD_USD,
+        "DIESEL": I_DIESEL_CMD_USD,
+
+        "SUGAR": I_SUGAR_CMD_USD,
+        "COCOA": I_COCOA_CMD_USD,
+
+        "COFFEE": I_COFFEE_CMD_USX,
+        "COTTON": I_COTTON_CMD_USX,
+        "SOYBEAN": I_SOYBEAN_CMD_USX,
+
+        "AAPL": I_AAPL_US_USD,
+        "MSFT": I_MSFT_US_USD,
+        "TSLA": I_TSLA_US_USD,
+        "AMZN": I_AMZN_US_USD,
+        "NVDA": I_NVDA_US_USD,
+        "GOOGL": I_GOOGL_US_USD,
+        "JPM": I_JPM_US_USD,
+        "GE": I_GE_US_USD,
+
+        "USTBOND": I_USTBOND_TR_USD,
     }
 
     for symbol, _instr in assets.items():
@@ -140,7 +242,12 @@ def analyst() -> None:
 
         print(f"[{symbol}] rows: {dataFrame.height}")
 
-        dataFrame = dataFrame.tail(10000) 
+        start = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2026, 2, 3, 0, 0, 0, tzinfo=timezone.utc)
+
+        dataFrame = dataFrame.filter(
+            (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
+        )
 
         fileName: str = f"{output_dir}/{symbol.lower()}.png"
         plt.plot(dataFrame["timestamp"], dataFrame["close"], color="black")
