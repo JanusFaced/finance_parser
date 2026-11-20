@@ -5,6 +5,7 @@ import time
 import psycopg2
 from psycopg2 import OperationalError
 import polars as pl
+import numpy as np
 from datetime import datetime, timezone, timedelta
 import dukascopy_python as duka
 from dukascopy_python.instruments import (
@@ -258,15 +259,122 @@ def analyst() -> None:
     print("End!")
     time.sleep(60)
 
+def get_data(
+        symbol: str,
+        timeFrame: str,
+        start: str,
+        end: str
+    ) -> pl.DataFrame:
+
+    originalName = f"dukascopy_{symbol}_futures".lower()
+
+    start = start.split("_")
+    end = end.split("_")
+
+    start = datetime(int(start[0]), int(start[1]), int(start[2]), 0, 0, 0, tzinfo=timezone.utc)
+    end = datetime(int(end[0]), int(end[1]), int(end[2]), 0, 0, 0, tzinfo=timezone.utc)
+
+    start_str = start.strftime("%Y-%m-%d %H:%M:%S")
+    end_str = end.strftime("%Y-%m-%d %H:%M:%S")
+
+    dataFrame = pl.read_database_uri(
+        query=f"""
+            SELECT *
+            FROM {originalName}
+            WHERE timestamp >= '{start_str}'
+              AND timestamp <  '{end_str}'
+            ORDER BY timestamp
+        """,
+        uri=DATABASE_URL,
+        engine="adbc",
+    )
+
+    resampled = (
+        dataFrame
+        .group_by_dynamic(
+            index_column="timestamp",
+            every=timeFrame,
+            closed="left",
+            label="left",
+        )
+        .agg([
+            pl.col("open").first(),
+            pl.col("high").max(),
+            pl.col("low").min(),
+            pl.col("close").last(),
+            pl.col("volume").sum(),
+        ])
+    )
+
+    resampled = resampled.filter(pl.col("close").is_not_null())
+
+    return resampled
+
+def merge_closes(frames: dict[str, pl.DataFrame]) -> pl.DataFrame:
+    dfs = [
+        df.select(
+            pl.col("timestamp"),
+            pl.col("close").alias(sym.upper()),
+        )
+        for sym, df in frames.items()
+    ]
+
+    result = dfs[0]
+    for other in dfs[1:]:
+        result = result.join(other, on="timestamp", how="inner")
+
+    return result.sort("timestamp")
+
+def cooking_data(symbols, timeFrame, start, end):
+
+    frames = {s: get_data(s, timeFrame, start, end) for s in symbols}
+
+    dataFrame = merge_closes(frames)
+
+    return dataFrame
+
+def finance_math():
+
+    symbols = ["EUR", "XAU", "USA500", "BRENT", "SUGAR", "AAPL", "USTBOND"]
+    timeFrame = "4h"
+    start, end = "2025_01_01", "2026_01_01"
+
+    dataFrame = cooking_data(symbols, timeFrame, start, end)
+
+    A = dataFrame.select(symbols).to_numpy().astype(np.float64)
+
+    A_centered = A - A.mean(axis=0, keepdims=True)
+
+    U, S, Vt = np.linalg.svd(A_centered, full_matrices=False)
+
+    factor1 = U[:, 0] * S[0]
+    factor2 = U[:, 1] * S[1]
+
+    fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+
+    axes[0].plot(dataFrame["timestamp"], factor1)
+
+    axes[1].plot(dataFrame["timestamp"], factor2)
+
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/svd_factors.png")
+    plt.close()
+
+    print("End!")
+    time.sleep(60)
+
 def main() -> None:
 
-    mode = "analyst" # mine/analyst
+    mode = "finance_math" # mine/analyst/finance_math
 
     if mode == "mine":
         parser()
 
     elif mode == "analyst":
         analyst()
+
+    elif mode == "finance_math":
+        finance_math()
 
     else:
         print("what?")
