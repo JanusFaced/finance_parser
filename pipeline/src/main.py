@@ -6,9 +6,14 @@ import psycopg2
 from psycopg2 import OperationalError
 import polars as pl
 import numpy as np
+from scipy.signal import periodogram
+from scipy.signal import detrend
 from datetime import datetime, timezone, timedelta
 import dukascopy_python as duka
 from dukascopy_python.instruments import (
+    I_BTC_USD,
+    I_ETH_USD,
+
     I_EUR_USD,
     I_GBP_USD,
     I_AUD_USD,
@@ -45,6 +50,24 @@ from dukascopy_python.instruments import (
     I_GOOGL_US_USD,
     I_JPM_US_USD,
     I_GE_US_USD,
+    I_NFLX_US_USD,
+    I_BABA_US_USD,
+    I_TSM_US_USD,
+    I_ORCL_US_USD,
+    I_INTC_US_USD,
+    I_AMD_US_USD,
+    I_QCOM_US_USD,
+    I_CSCO_US_USD,
+    I_IBM_US_USD,
+    I_BAC_US_USD,
+    I_GS_US_USD,
+    I_MS_US_USD,
+    I_C_US_USD,
+    I_V_US_USD,
+    I_MA_US_USD,
+    I_PEP_US_USD,
+    I_KO_US_USD,
+    I_PG_US_USD,
 
     I_USTBOND_TR_USD,
 )
@@ -87,6 +110,9 @@ def parser() -> None:
     conn = get_conn()
 
     assets = {
+        "BTC": I_BTC_USD,
+        "ETH": I_ETH_USD,
+
         "EUR": I_EUR_USD,
         "GBP": I_GBP_USD,
         "AUD": I_AUD_USD,
@@ -123,6 +149,24 @@ def parser() -> None:
         "GOOGL": I_GOOGL_US_USD,
         "JPM": I_JPM_US_USD,
         "GE": I_GE_US_USD,
+        "NFLX": I_NFLX_US_USD,
+        "BABA": I_BABA_US_USD,
+        "TSM": I_TSM_US_USD,
+        "ORCL": I_ORCL_US_USD,
+        "INTC": I_INTC_US_USD,
+        "AMD": I_AMD_US_USD,
+        "QCOM": I_QCOM_US_USD,
+        "CSCO": I_CSCO_US_USD,
+        "IBM": I_IBM_US_USD,
+        "BAC": I_BAC_US_USD,
+        "GS": I_GS_US_USD,
+        "MS": I_MS_US_USD,
+        "C": I_C_US_USD,
+        "V": I_V_US_USD,
+        "MA": I_MA_US_USD,
+        "PEP": I_PEP_US_USD,
+        "KO": I_KO_US_USD,
+        "PG": I_PG_US_USD,
 
         "USTBOND": I_USTBOND_TR_USD,
     }
@@ -192,6 +236,9 @@ def parser() -> None:
 def analyst() -> None:
 
     assets = {
+        "BTC": I_BTC_USD,
+        "ETH": I_ETH_USD,
+
         "EUR": I_EUR_USD,
         "GBP": I_GBP_USD,
         "AUD": I_AUD_USD,
@@ -228,6 +275,24 @@ def analyst() -> None:
         "GOOGL": I_GOOGL_US_USD,
         "JPM": I_JPM_US_USD,
         "GE": I_GE_US_USD,
+        "NFLX": I_NFLX_US_USD,
+        "BABA": I_BABA_US_USD,
+        "TSM": I_TSM_US_USD,
+        "ORCL": I_ORCL_US_USD,
+        "INTC": I_INTC_US_USD,
+        "AMD": I_AMD_US_USD,
+        "QCOM": I_QCOM_US_USD,
+        "CSCO": I_CSCO_US_USD,
+        "IBM": I_IBM_US_USD,
+        "BAC": I_BAC_US_USD,
+        "GS": I_GS_US_USD,
+        "MS": I_MS_US_USD,
+        "C": I_C_US_USD,
+        "V": I_V_US_USD,
+        "MA": I_MA_US_USD,
+        "PEP": I_PEP_US_USD,
+        "KO": I_KO_US_USD,
+        "PG": I_PG_US_USD,
 
         "USTBOND": I_USTBOND_TR_USD,
     }
@@ -239,15 +304,6 @@ def analyst() -> None:
             query=f"SELECT * FROM {tableName} ORDER BY timestamp",
             uri=DATABASE_URL,
             engine="adbc",
-        )
-
-        print(f"[{symbol}] rows: {dataFrame.height}")
-
-        start = datetime(2026, 2, 2, 0, 0, 0, tzinfo=timezone.utc)
-        end = datetime(2026, 2, 3, 0, 0, 0, tzinfo=timezone.utc)
-
-        dataFrame = dataFrame.filter(
-            (pl.col("timestamp") >= start) & (pl.col("timestamp") < end)
         )
 
         fileName: str = f"{output_dir}/{symbol.lower()}.png"
@@ -333,39 +389,306 @@ def cooking_data(symbols, timeFrame, start, end):
 
     return dataFrame
 
-def finance_math():
+def math_svd():
 
-    symbols = ["EUR", "XAU", "USA500", "BRENT", "SUGAR", "AAPL", "USTBOND"]
+    symbols = [
+        "BTC", "ETH",
+        "EUR", "GBP", "AUD", "NZD",
+        "XAU", "XAG", "COPPER",
+        "USA500", "USATECH",
+        "BRENT", "LIGHT", "GAS", "DIESEL",
+        "SUGAR", "COCOA",
+        "AAPL", "MSFT", "TSLA", "AMZN", "NVDA", "GOOGL", "JPM", "NFLX", "TSM", "INTC", "AMD", "QCOM",
+        "USTBOND",
+    ]
+
+    dataFrame = cooking_data(symbols, "4h", "2019_01_01", "2026_11_19")
+
+    timestamps = dataFrame["timestamp"].to_list()
+    A = dataFrame.select(symbols).to_numpy().astype(np.float64)
+
+    mean_vals = A.mean(axis=0)
+    std_vals = A.std(axis=0)
+    A_norm = (A - mean_vals) / std_vals
+
+    U, S, Vt = np.linalg.svd(A_norm, full_matrices=False)
+
+    n_factors = 5
+    scores = U[:, :n_factors] * S[:n_factors]
+    loadings = Vt[:n_factors, :]
+
+    plt.figure(figsize=(14, 8))
+    im = plt.imshow(loadings, cmap='coolwarm', aspect='auto', origin='lower')
+    plt.colorbar(im, fraction=0.05)
+    
+    plt.title('Нагрузки активов на факторы (Стандартизированные)')
+    plt.xlabel('Актив')
+    plt.ylabel('Фактор (PC)')
+    
+    plt.xticks(range(len(symbols)), symbols, rotation=45, ha='right', fontsize=9)
+    plt.yticks(range(n_factors), [f'Фактор {i+1}' for i in range(n_factors)])
+
+    for x in range(loadings.shape[1]):
+        for y in range(loadings.shape[0]):
+            val = loadings[y, x]
+            text_color = "white" if abs(val) > 0.6 else "black"
+            plt.text(x, y, f'{val:.2f}', ha="center", va="center", color=text_color, fontweight='bold', fontsize=8)
+
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/svd_heatmap.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    print("Heatmap saved.")
+
+    plt.figure(figsize=(14, 6))
+    for i in range(n_factors):
+        plt.plot(timestamps, scores[:, i], label=f'Фактор {i+1}', linewidth=1.5)
+        
+    plt.title('Динамика главных факторов во времени')
+    plt.xlabel('Время')
+    plt.ylabel('Значение фактора (Z-Score)')
+    plt.legend(loc='upper left')
+    plt.grid(True, linestyle=':', alpha=0.5)
+    plt.xticks(rotation=45)
+
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/svd_time_series.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    print("Time series saved!")
+
+    explained_variance_ratio = (S**2) / np.sum(S**2) * 100
+    cumulative_variance = np.cumsum(explained_variance_ratio)
+
+    plt.figure(figsize=(12, 6))
+    
+    k_show = min(n_factors, len(S))
+    x_ticks = range(1, k_show + 1)
+    
+    bars = plt.bar(x_ticks, explained_variance_ratio[:k_show], color='steelblue', alpha=0.7, label='Индивидуальный вклад')
+    plt.plot(x_ticks, cumulative_variance[:k_show], 'ro-', linewidth=2, label='Накопленный итог')
+
+    plt.title('Сила главных факторов (Explained Variance)')
+    plt.xlabel('Номер компонента (PC)')
+    plt.ylabel('Доля дисперсии (%)')
+    plt.xticks(x_ticks)
+    plt.grid(True, linestyle='--', alpha=0.3, axis='y')
+    plt.legend()
+
+    for i, v in enumerate(explained_variance_ratio[:k_show]):
+        plt.text(i+1, v + 0.5, f'{v:.1f}%', ha='center', fontweight='bold')
+
+    plt.tight_layout()
+    plt.savefig(f"{output_dir}/svd_scree_plot.png", dpi=150, bbox_inches='tight')
+    plt.close()
+    print("Scree plot saved!")
+
+    time.sleep(60)
+
+def math_fourier():
+
+    symbols = [
+        "BTC", "ETH",
+        "EUR", "GBP", "AUD", "NZD",
+        "XAU", "XAG", "COPPER",
+        "USA500", "USATECH",
+        "BRENT", "LIGHT", "GAS", "DIESEL",
+        "SUGAR", "COCOA",
+        "AAPL", "MSFT", "TSLA", "AMZN", "NVDA", "GOOGL", "JPM", "NFLX", "TSM", "INTC", "AMD", "QCOM",
+        "USTBOND",
+    ]
+
     timeFrame = "4h"
-    start, end = "2025_01_01", "2026_01_01"
+    timeFrameNum = 4
+    
+    dayNum = 24
+    minPeriodSize = 2
+    maxPeriodSize = 2000
+
+    start = "2019_01_01"
+    end = "2026_11_19"
+
+    average_window = 3
 
     dataFrame = cooking_data(symbols, timeFrame, start, end)
 
-    A = dataFrame.select(symbols).to_numpy().astype(np.float64)
+    for target_symbol in symbols:
 
-    A_centered = A - A.mean(axis=0, keepdims=True)
+        dataFrame = dataFrame.with_columns([
+            pl.col(target_symbol).rolling_mean(window_size=average_window).alias('mean'),
+        ])
 
-    U, S, Vt = np.linalg.svd(A_centered, full_matrices=False)
+        vector = dataFrame["mean"].to_numpy().astype(np.float64)
+        vector = vector[np.isfinite(vector)]
+        
+        prices_detrended = detrend(vector, type='linear')
 
-    factor1 = U[:, 0] * S[0]
-    factor2 = U[:, 1] * S[1]
+        fs = dayNum/timeFrameNum
 
-    fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+        frequencies, power = periodogram(prices_detrended, fs=fs, scaling='spectrum')
 
-    axes[0].plot(dataFrame["timestamp"], factor1)
+        periods_days = (1/frequencies) / dayNum
+        mask = (periods_days > minPeriodSize) & (periods_days < maxPeriodSize)
 
-    axes[1].plot(dataFrame["timestamp"], factor2)
+        plt.figure(figsize=(14, 7))
 
-    plt.tight_layout()
-    plt.savefig(f"{output_dir}/svd_factors.png")
-    plt.close()
+        plt.plot(periods_days[mask], power[mask], color='darkviolet', linewidth=1.5)
+        plt.fill_between(periods_days[mask], power[mask], alpha=0.3, color='darkviolet')
+        
+        plt.title(f'Спектральный анализ: {target_symbol}\n(Поиск скрытых рыночных циклов)', fontsize=14)
+        plt.xlabel('Длина цикла (в днях)', fontsize=12)
+        plt.ylabel('Мощность влияния (Spectral Power)', fontsize=12)
+        
+        plt.axvline(x=30, color='red', linestyle='--', alpha=0.5, label='Размер месяца (30 дн.)')
+
+        plt.xlim(left=10)
+        plt.grid(True, linestyle='--', alpha=0.3)
+        plt.legend(loc='upper right')
+        
+        if len(power[mask]) > 0:
+            max_power_idx = np.argmax(power[mask])
+            dominant_period = periods_days[mask][max_power_idx]
+            plt.text(
+                dominant_period, power[mask][max_power_idx], 
+                f'Главный цикл: {dominant_period:.0f} свечей', 
+                ha='center', va='bottom', fontsize=10, color='red', fontweight='bold'
+            )
+
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/fourier_{target_symbol}.png", dpi=150, bbox_inches='tight')
+        plt.close()
+
+        print(f"Анализ завершен. Главный найденный цикл для {target_symbol}: ~{dominant_period:.0f} дней.")
 
     print("End!")
+
+    time.sleep(60)
+
+def svd_fourier_hybrid():
+
+    symbols = [
+        "BTC", "ETH",
+        "EUR", "GBP", "AUD", "NZD",
+        "XAU", "XAG", "COPPER",
+        "USA500", "USATECH",
+        "BRENT", "LIGHT", "GAS", "DIESEL",
+        "SUGAR", "COCOA",
+        "AAPL", "MSFT", "TSLA", "AMZN", "NVDA", "GOOGL", "JPM", "NFLX", "TSM", "INTC", "AMD", "QCOM",
+        "USTBOND",
+    ]
+
+    timeFrame = "4h"
+    start = "2019_01_01"
+    end = "2026_11_19"
+    n_factors = 3
+    
+    minPeriodSize = 2
+    maxPeriodSize = 365
+    top_n = 3
+
+    print("Загрузка и подготовка данных...")
+    dataFrame = cooking_data(symbols, timeFrame, start, end)
+    
+    # Расчет коэффициента плотности (k_ratio) на основе всего датасета
+    num_candles = len(dataFrame)
+    real_start_datetime = dataFrame['timestamp'][0]
+    real_end_datetime = dataFrame['timestamp'][-1]
+    real_days = (real_end_datetime - real_start_datetime).total_seconds() / 86400.0
+    k_ratio = num_candles / real_days if real_days > 0 else 1
+    
+    print(f"Коэффициент плотности данных (k): {k_ratio:.3f} свечей/день")
+
+    # Очистка и нормализация
+    A = dataFrame.select(symbols).drop_nulls().to_numpy().astype(np.float64)
+    A_norm = (A - A.mean(axis=0)) / A.std(axis=0)
+    
+    # SVD разложение
+    U, S, Vt = np.linalg.svd(A_norm, full_matrices=False)
+    
+    # Заголовок для сводной таблицы в консоли
+    print(f"\n{'Актив':<10} | {'1-й цикл (дн.)':<15} | {'2-й цикл (дн.)':<15} | {'3-й цикл (дн.)':<15}")
+    print("-" * 75)
+
+    for index in range(len(symbols)):
+        symbol = symbols[index]
+        
+        # 1. Восстановление теоретической цены через N факторов
+        theoretical_signal = np.zeros(len(A))
+        for i in range(n_factors):
+            theoretical_signal += (U[:, i] * S[i]) * Vt[i, index]
+        
+        # 2. Расчет остатков (Residuals)
+        residuals = A_norm[:, index] - theoretical_signal
+        
+        # 3. Фурье-анализ остатков
+        res_detrended = detrend(residuals, type='linear')
+        frequencies, power = periodogram(res_detrended, fs=1.0, scaling='spectrum')
+        
+        # Перевод в реальные дни с учетом k_ratio
+        periods_days = (1.0 / frequencies[1:]) / k_ratio
+        power_clean = power[1:]
+        
+        # Фильтрация диапазона
+        mask = (periods_days > minPeriodSize) & (periods_days < maxPeriodSize)
+        p_filtered = periods_days[mask]
+        pow_filtered = power_clean[mask]
+        
+        # 4. Поиск ТОП-N уникальных пиков
+        top_cycles = []
+        if len(pow_filtered) > 0:
+            # Сортируем индексы по убыванию мощности
+            sorted_indices = np.argsort(pow_filtered)[::-1]
+            
+            for idx in sorted_indices:
+                period = p_filtered[idx]
+                power_val = pow_filtered[idx]
+                
+                # Проверка на уникальность (чтобы не взять два пика рядом)
+                is_unique = True
+                for existing_period, _ in top_cycles:
+                    if abs(period - existing_period) < 5: # Допуск 5 дней
+                        is_unique = False
+                        break
+                
+                if is_unique:
+                    top_cycles.append((round(period, 1), round(power_val, 4)))
+                
+                if len(top_cycles) >= top_n:
+                    break
+        
+        # 5. Визуализация
+        plt.figure(figsize=(12, 6))
+        plt.vlines(p_filtered, 0, pow_filtered, color='crimson', linewidth=1.0, alpha=0.6)
+        
+        title_text = f'Спектр собственных циклов: {symbol}\n(После вычета {n_factors} глобальных факторов)'
+        plt.title(title_text, fontsize=14)
+        plt.xlabel('Период цикла (Реальные дни)')
+        plt.ylabel('Мощность сигнала')
+        plt.grid(True, linestyle='--', alpha=0.3, axis='y')
+        plt.xlim(minPeriodSize, maxPeriodSize)
+        
+        # Отмечаем найденные топы на графике
+        colors = ['black', 'blue', 'green']
+        for i, (p, val) in enumerate(top_cycles):
+            plt.vlines(p, 0, val, color=colors[i], linewidth=2.5, label=f'Топ-{i+1}: {p} дн.')
+            
+        if top_cycles:
+            plt.legend(loc='upper right')
+            
+        plt.tight_layout()
+        plt.savefig(f"{output_dir}/{symbol}_svd_fourier_top{top_n}.png", dpi=150)
+        plt.close()
+
+        # Вывод в консоль
+        c1 = f"{top_cycles[0][0]}" if len(top_cycles) > 0 else "-"
+        c2 = f"{top_cycles[1][0]}" if len(top_cycles) > 1 else "-"
+        c3 = f"{top_cycles[2][0]}" if len(top_cycles) > 2 else "-"
+        print(f"{symbol:<10} | {c1:<15} | {c2:<15} | {c3:<15}")
+
+    print("\nАнализ завершен! Графики сохранены.")
     time.sleep(60)
 
 def main() -> None:
 
-    mode = "finance_math" # mine/analyst/finance_math
+    mode = "svd_fourier_hybrid"
 
     if mode == "mine":
         parser()
@@ -373,8 +696,14 @@ def main() -> None:
     elif mode == "analyst":
         analyst()
 
-    elif mode == "finance_math":
-        finance_math()
+    elif mode == "math_svd":
+        math_svd()
+
+    elif mode == "math_fourier":
+        math_fourier()
+
+    elif mode == "svd_fourier_hybrid":
+        svd_fourier_hybrid()
 
     else:
         print("what?")
